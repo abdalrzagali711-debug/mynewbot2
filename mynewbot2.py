@@ -1,75 +1,52 @@
 import os
-import logging
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
-
-# تسجيل الأخطاء
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 # قراءة التوكن من Environment Variable
 TOKEN = os.environ.get("TOKEN")
 if not TOKEN:
     raise ValueError("يرجى تعيين توكن البوت كمتغير بيئة باسم TOKEN")
 
-USERS_FILE = "users.txt"
+# قراءة البورت من Environment Variable (Render يعطي PORT تلقائيًا)
+PORT = int(os.environ.get("PORT", 5000))
 
-# حفظ المستخدمين الجدد
-def save_user(user_id):
-    if not os.path.exists(USERS_FILE):
-        with open(USERS_FILE, "w") as f:
-            f.write(f"{user_id}\n")
-        return
-    with open(USERS_FILE, "r") as f:
-        users = f.read().splitlines()
-    if str(user_id) not in users:
-        with open(USERS_FILE, "a") as f:
-            f.write(f"{user_id}\n")
+# عدد المستخدمين المتصلين (يمكنك حفظه لاحقًا في قاعدة بيانات)
+users = set()
 
-# أمر /start
+# خدمات مجانية
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.message.from_user
-    save_user(user.id)
-    await update.message.reply_text(f"أهلاً {user.first_name} 👋\nالبوت جاهز للاستخدام!")
+    users.add(update.message.from_user.id)  # حفظ المستخدم
+    name = update.message.from_user.first_name
+    await update.message.reply_text(f"أهلاً {name} 👋\nالبوت شغال 24 ساعة!\nالخدمات المجانية:\n1- خدمة تحويل صورة\n2- خدمة إزالة خلفية\n3- خدمة معلومات عامة\n4- خدمة ترحيب شخصي")
 
-# خدمة تحويل النصوص إلى صورة (مجرد مثال)
-async def text_to_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if len(context.args) == 0:
-        await update.message.reply_text("يرجى كتابة النص بعد الأمر.\nمثال: /image مرحبا")
-        return
-    text = " ".join(context.args)
-    # هنا يمكن ربط مكتبة توليد الصور أو AI لاحقًا
-    await update.message.reply_text(f"تم استلام النص: {text}\nسيتم تحويله لصورة لاحقاً 🚀")
+async def service1(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("✅ هذه خدمة تحويل صورة مجانية (تطوير لاحق للاشتراك)")
 
-# خدمة إزالة الخلفية من الصورة (مجرد مثال)
-async def remove_bg(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message.photo:
-        await update.message.reply_text("أرسل صورة لإزالة الخلفية.")
-        return
-    await update.message.reply_text("تم استلام الصورة، سيتم إزالة الخلفية لاحقاً ✂️")
+async def service2(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("✅ هذه خدمة إزالة خلفية الصور مجانية")
 
-# معرفة عدد المستخدمين
+async def service3(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("✅ هذه خدمة معلومات عامة مجانية")
+
 async def count_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not os.path.exists(USERS_FILE):
-        await update.message.reply_text("لا يوجد مستخدمين حالياً.")
-        return
-    with open(USERS_FILE, "r") as f:
-        users = f.read().splitlines()
-    await update.message.reply_text(f"عدد المستخدمين الحاليين: {len(users)}")
+    await update.message.reply_text(f"عدد المستخدمين الذين استخدموا البوت: {len(users)}")
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
-
-    # أوامر
+    
+    # إضافة أوامر
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("image", text_to_image))
-    app.add_handler(CommandHandler("removebg", remove_bg))
+    app.add_handler(CommandHandler("service1", service1))
+    app.add_handler(CommandHandler("service2", service2))
+    app.add_handler(CommandHandler("service3", service3))
     app.add_handler(CommandHandler("users", count_users))
 
-    # تشغيل البوت
-    app.run_polling()
+    # تشغيل Webhook على Render
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        webhook_url=f"https://{os.environ.get('RENDER_EXTERNAL_URL')}/{TOKEN}"
+    )
 
 if __name__ == "__main__":
     main()
